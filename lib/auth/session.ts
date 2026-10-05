@@ -6,6 +6,11 @@ import { NewUser } from '@/lib/db/schema';
 const key = new TextEncoder().encode(process.env.AUTH_SECRET);
 const SALT_ROUNDS = 10;
 
+// Browsers drop `Secure` cookies served over plain HTTP on any host other than
+// localhost, which makes sign-in silently bounce back to /sign-in on http://
+// development and preview deployments. Keep the flag on in production only.
+export const SESSION_COOKIE_SECURE = process.env.NODE_ENV === 'production';
+
 export async function hashPassword(password: string) {
   return hash(password, SALT_ROUNDS);
 }
@@ -53,7 +58,7 @@ export async function setSession(user: NewUser) {
   (await cookies()).set('session', encryptedSession, {
     expires: expiresInOneDay,
     httpOnly: true,
-    secure: true,
+    secure: SESSION_COOKIE_SECURE,
     sameSite: 'lax',
   });
 }

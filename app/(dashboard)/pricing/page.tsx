@@ -1,6 +1,10 @@
 import { checkoutAction } from '@/lib/payments/actions';
 import { Check } from 'lucide-react';
-import { getStripePrices, getStripeProducts } from '@/lib/payments/stripe';
+import {
+  getStripePrices,
+  getStripeProducts,
+  isStripeConfigured,
+} from '@/lib/payments/stripe';
 import { SubmitButton } from './submit-button';
 
 // Prices are fresh for one hour max
@@ -32,6 +36,7 @@ export default async function PricingPage() {
             'Email Support',
           ]}
           priceId={basePrice?.id}
+          billingEnabled={isStripeConfigured}
         />
         <PricingCard
           name={plusPlan?.name || 'Plus'}
@@ -44,6 +49,7 @@ export default async function PricingPage() {
             '24/7 Support + Slack Access',
           ]}
           priceId={plusPrice?.id}
+          billingEnabled={isStripeConfigured}
         />
       </div>
     </main>
@@ -57,6 +63,7 @@ function PricingCard({
   trialDays,
   features,
   priceId,
+  billingEnabled,
 }: {
   name: string;
   price: number;
@@ -64,6 +71,7 @@ function PricingCard({
   trialDays: number;
   features: string[];
   priceId?: string;
+  billingEnabled: boolean;
 }) {
   return (
     <div className="pt-6">
@@ -87,8 +95,14 @@ function PricingCard({
       </ul>
       <form action={checkoutAction}>
         <input type="hidden" name="priceId" value={priceId} />
-        <SubmitButton />
+        <SubmitButton disabled={!billingEnabled} />
       </form>
+      {!billingEnabled && (
+        <p className="text-sm text-gray-500 mt-3">
+          Checkout is disabled because Stripe is not configured. Set
+          STRIPE_SECRET_KEY to enable it.
+        </p>
+      )}
     </div>
   );
 }
