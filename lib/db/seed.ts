@@ -1,4 +1,5 @@
-import { stripe } from '../payments/stripe';
+import { eq } from 'drizzle-orm';
+import { isStripeConfigured, stripe } from '../payments/stripe';
 import { db } from './drizzle';
 import { users, teams, teamMembers } from './schema';
 import { hashPassword } from '@/lib/auth/session';
@@ -44,6 +45,19 @@ async function seed() {
   const password = 'admin123';
   const passwordHash = await hashPassword(password);
 
+  // Make re-running the seed safe (e.g. in preview environments that run it
+  // on every boot): skip if the seed user already exists.
+  const existing = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+
+  if (existing.length > 0) {
+    console.log('Seed user already exists, skipping.');
+    return;
+  }
+
   const [user] = await db
     .insert(users)
     .values([
@@ -70,7 +84,11 @@ async function seed() {
     role: 'owner',
   });
 
-  await createStripeProducts();
+  if (isStripeConfigured) {
+    await createStripeProducts();
+  } else {
+    console.log('STRIPE_SECRET_KEY not set, skipping Stripe products.');
+  }
 }
 
 seed()
