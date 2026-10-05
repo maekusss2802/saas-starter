@@ -7,7 +7,15 @@ import {
   updateTeamSubscription
 } from '@/lib/db/queries';
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+// Billing is optional for local development and preview environments. Without a
+// key the SDK constructor throws at module scope, which takes down every route
+// that transitively imports this file (including /pricing and `next build`).
+// Construct with a placeholder instead and gate the call sites on this flag.
+export const isStripeConfigured = Boolean(stripeSecretKey);
+
+export const stripe = new Stripe(stripeSecretKey ?? 'sk_test_not_configured', {
   apiVersion: '2025-04-30.basil'
 });
 
@@ -22,6 +30,12 @@ export async function createCheckoutSession({
 
   if (!team || !user) {
     redirect(`/sign-up?redirect=checkout&priceId=${priceId}`);
+  }
+
+  if (!isStripeConfigured) {
+    throw new Error(
+      'Stripe is not configured. Set STRIPE_SECRET_KEY to enable checkout.'
+    );
   }
 
   const session = await stripe.checkout.sessions.create({
@@ -47,7 +61,7 @@ export async function createCheckoutSession({
 }
 
 export async function createCustomerPortalSession(team: Team) {
-  if (!team.stripeCustomerId || !team.stripeProductId) {
+  if (!isStripeConfigured || !team.stripeCustomerId || !team.stripeProductId) {
     redirect('/pricing');
   }
 
@@ -147,6 +161,10 @@ export async function handleSubscriptionChange(
 }
 
 export async function getStripePrices() {
+  if (!isStripeConfigured) {
+    return [];
+  }
+
   const prices = await stripe.prices.list({
     expand: ['data.product'],
     active: true,
@@ -165,6 +183,10 @@ export async function getStripePrices() {
 }
 
 export async function getStripeProducts() {
+  if (!isStripeConfigured) {
+    return [];
+  }
+
   const products = await stripe.products.list({
     active: true,
     expand: ['data.default_price']
